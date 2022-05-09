@@ -3,11 +3,12 @@ const pvp = require('mineflayer-pvp').plugin;
 const { pathfinder, Movements, goals } = require('mineflayer-pathfinder');
 const armourManager = require('mineflayer-armor-manager');
 const autoeat = require('mineflayer-auto-eat');
+const { GoalFollow } = goals;
 
 const bot = mineflayer.createBot({
   host: 'localhost',
   username: 'Tony',
-  port: 58466,
+  port: 63768,
   logErrors: false,
   // version: false,
   // auth: 'mojang'
@@ -103,9 +104,13 @@ bot.on('autoeat_started', () => {
   bot.chat('Надо подкрепиться');
 });
 
+bot.on('autoeat_stopped', () => {
+  bot.chat('Готово');
+});
+
 bot.on('health', () => {
   if (bot.food === 20) bot.autoEat.disable();
-  if (bot.food < 17) bot.autoEat.enable();
+  else bot.autoEat.enable();
   if (Math.floor(bot.health) === 6)
     bot.chat(`Твою мать! ${bot.health.toFixed(1) / 2}хп осталось`);
 });
@@ -186,6 +191,26 @@ bot.on('entityWake', () => {
   wakeUp();
 });
 
+// следовать за игроком
+
+function followPlayer(player) {
+  const playerCI = bot.players[player];
+
+  if (!playerCI || !playerCI.entity) {
+    bot.chat('Я не вижу цель');
+    return;
+  }
+
+  const mcData = require('minecraft-data')(bot.version);
+  const movements = new Movements(bot, mcData);
+  movements.scafoldingBlocks = [];
+
+  bot.pathfinder.setMovements(movements);
+
+  const goal = new GoalFollow(playerCI.entity, 1);
+  bot.pathfinder.setGoal(goal, true);
+}
+
 // команды
 
 bot.on('chat', (username, message) => {
@@ -229,6 +254,12 @@ bot.on('chat', (username, message) => {
 
         bot.chat('Теперь это мой дом');
         guardArea(guardPlayer.entity.position);
+        break;
+      case 'follow':
+        followPlayer(username);
+        break;
+      case 'stop follow':
+        bot.pathfinder.setGoal(null);
         break;
     }
 
