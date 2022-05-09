@@ -3,7 +3,6 @@ const pvp = require('mineflayer-pvp').plugin;
 const { pathfinder, Movements, goals } = require('mineflayer-pathfinder');
 const armourManager = require('mineflayer-armor-manager');
 const autoeat = require('mineflayer-auto-eat');
-const mineflayerViewer = require('prismarine-viewer').mineflayer;
 
 const bot = mineflayer.createBot({
   host: 'localhost',
