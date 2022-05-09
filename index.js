@@ -19,6 +19,21 @@ bot.loadPlugin(armourManager);
 bot.loadPlugin(pathfinder);
 bot.loadPlugin(autoeat);
 
+// переменные
+
+let activeFollow = false;
+
+const moods = [
+  'всё ок',
+  'хорошо',
+  'нормально',
+  'не очень, меня сегодня взорвал крипер, было больно :(',
+  'бывало и лучше',
+  'очень хорошо, сегодя нашёл кладку алмазов :)',
+  'мне уже надоели эти зомбаки',
+  'отлично, спасибо за беспокойствие',
+];
+
 // коогда что то выбрасывается
 
 bot.on('playerCollect', (collector, itemDrop) => {
@@ -46,6 +61,8 @@ bot.on('playerCollect', (collector, itemDrop) => {
 // прийти к игроку
 
 let guardPos = null;
+
+bot.once('spawn', () => (guardPos = bot.spawnPoint));
 
 function guardArea(pos) {
   setGuardPos(pos.clone());
@@ -100,14 +117,6 @@ bot.once('spawn', () => {
   };
 });
 
-bot.on('autoeat_started', () => {
-  bot.chat('Надо подкрепиться');
-});
-
-bot.on('autoeat_stopped', () => {
-  bot.chat('Готово');
-});
-
 bot.on('health', () => {
   if (bot.food === 20) bot.autoEat.disable();
   else bot.autoEat.enable();
@@ -118,8 +127,13 @@ bot.on('health', () => {
 // остановить атаку
 
 bot.on('stoppedAttacking', () => {
-  if (guardPos) {
+  if (guardPos && !activeFollow) {
     moveToPos(guardPos);
+    return;
+  }
+
+  if (activeFollow) {
+    followPlayer(activeFollow);
   }
 });
 
@@ -155,6 +169,7 @@ bot.on('physicTick', () => {
 bot.on('sleep', () => {
   bot.chat('Спакойной ночки!');
 });
+
 bot.on('wake', () => {
   bot.chat('Доброе утро!');
 });
@@ -194,6 +209,7 @@ bot.on('entityWake', () => {
 // следовать за игроком
 
 function followPlayer(player) {
+  activeFollow = player;
   const playerCI = bot.players[player];
 
   if (!playerCI || !playerCI.entity) {
@@ -211,6 +227,20 @@ function followPlayer(player) {
   bot.pathfinder.setGoal(goal, true);
 }
 
+function stopFollow() {
+  if (activeFollow) {
+    bot.chat(`Я больше не следую за ${activeFollow}`);
+  }
+  activeFollow = false;
+}
+
+// рандомное число
+
+function randomInteger(min, max) {
+  let rand = min + Math.random() * (max + 1 - min);
+  return Math.floor(rand);
+}
+
 // команды
 
 bot.on('chat', (username, message) => {
@@ -219,6 +249,7 @@ bot.on('chat', (username, message) => {
   if (username === 'Swingor') {
     switch (message.toLowerCase().slice(0, 5)) {
       case 'fight':
+        stopFollow();
         const fightPlayer = bot.players[message.substr(6)];
 
         if (!fightPlayer) {
@@ -241,10 +272,12 @@ bot.on('chat', (username, message) => {
           bot.chat('У меня нет дома');
           return;
         }
+        stopFollow();
         moveToPos(guardPos);
         bot.chat('Бегу домой');
         break;
       case 'guard':
+        stopFollow();
         const guardPlayer = bot.players[username];
 
         if (!guardPlayer) {
@@ -252,19 +285,23 @@ bot.on('chat', (username, message) => {
           return;
         }
 
-        bot.chat('Теперь это мой дом');
         guardArea(guardPlayer.entity.position);
+        bot.chat('Теперь это мой дом');
         break;
       case 'follow':
         followPlayer(username);
+        bot.chat('Я следую за тобой');
         break;
       case 'stop follow':
+        stopFollow();
         bot.pathfinder.setGoal(null);
+        bot.chat('Я больше не следую за тобой');
         break;
     }
 
     switch (message.toLowerCase().slice(0, 4)) {
       case 'come':
+        stopFollow();
         let comePlayer = bot.players[message.substr(5)].entity.position;
 
         if (Math.floor(comePlayer.y) !== comePlayer.y) {
@@ -281,7 +318,12 @@ bot.on('chat', (username, message) => {
     }
   }
 
-  if (message.toLowerCase() === 'привет') {
-    bot.chat('Привет друг');
+  switch (message.toLowerCase()) {
+    case 'привет':
+      bot.chat('Привет друг');
+      break;
+    case 'как дела':
+      bot.chat(moods[randomInteger(0, moods.length)]);
+      break;
   }
 });
