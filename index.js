@@ -3,12 +3,13 @@ const pvp = require('mineflayer-pvp').plugin;
 const { pathfinder, Movements, goals } = require('mineflayer-pathfinder');
 const armourManager = require('mineflayer-armor-manager');
 const autoeat = require('mineflayer-auto-eat');
+const collectBlock = require('mineflayer-collectblock').plugin;
 const { GoalFollow } = goals;
 
 const bot = mineflayer.createBot({
   host: 'localhost',
   username: 'Tony',
-  port: 63768,
+  port: process.argv[2],
   logErrors: false,
   // version: false,
   // auth: 'mojang'
@@ -18,10 +19,25 @@ bot.loadPlugin(pvp);
 bot.loadPlugin(armourManager);
 bot.loadPlugin(pathfinder);
 bot.loadPlugin(autoeat);
+bot.loadPlugin(collectBlock);
 
 // переменные
 
 let activeFollow = false;
+let collecting = false;
+let guarding = false;
+let homePos = null;
+let mcData;
+
+const jokes = [
+  'velkaa: что там?\nlav: Стасег красафчег\nlav: Я его надоумил попробовать в Майнкрафт на геймпаде поиграть\nlav: Он подключил ПИЛОТНыЙ РУЛЬ и теперь у него не песочница, а СИМУЛЯТОР ЭКСКАВАТОРА',
+  'Нуб и опытный игрок бродят по серверу.Вдруг нуб говорит:\n- А чё это за огурец к нам бежит? А может мне подойти поближе...',
+  'Приходит ГГ (главный герой) как то домой после шахты уставший, камней столько, хоть великую китайскую стену строй. Смотрит а там криппер с херобрином тортик едят. Херобрин говорит:\nПривет, друг устал? садись к нам тортик кушать.\nГГ:\nНе те грибы были в тарелке…',
+  'Ну значит урок.\nСидят зомби за партами. Вдруг врывается в кабинет крипер, и не здороваясь садится на место.\nУчительница (херобрин) :\n-Крипер! Выйди и зайди как заходит домой твой папа-крипер!\nОн выходит, с размаха открывает дверь, и орет :\n- НУ ЧТО СВОЛОЧИ, НЕ ЖДАЛИ?!',
+  'Забросили как-то крипера, зомби, и скелета на необитаемый остров.\nТут набежали херобрины, сказали : тот кто пробежит быстрее, и соберет 10 блоков или предметов, того отпустим.\nНу бежит значит крипер. Насобирал 10 батонов.\nПрибегает, ему говорят : засунь их себе в ж*пу, тогда отпустим\nНу он засунул 8 и умер.\nТут бежит зомби. Принес 10 горсток сахара. Ну засунул, и стоит.\nЕму говорят : что стоишь, идти уже можешь\nА он : Да скелет там мечей насобирал, посмотреть хочу',
+  'Ехали парни из клана на сервере воевать с другим кланом. Такие все мрачные — у всех ведь алмазные шмотки, жаль терять. А командир такой говорит:\n- Да ладно вам, ребят. Зато, прикиньте, за каждого убитого нам дадут по 1000 на человека!\nНу они такие все стали боевыми и веселыми, уже приготовились. Как только вагонетки останавливаются, они как вылетают с луками и мечами! Командир только рот раскрыл. Через полчаса вернулись они, все в крови, с новейшими шмотками и с головами игроков. А командир че-то в обморок упал. Они его в чувство привели, а он им:\n- Ребята, да вы че, о***ли? Мы же в городе остановились для перекуса!',
+  '-Жизнь так жестока в MineCraft.\n-Что? Тебя кто-то убил?\n-Да!\n-И кто же?\n-Кактус! :,((',
+];
 
 const moods = [
   'всё ок',
@@ -32,7 +48,26 @@ const moods = [
   'очень хорошо, сегодя нашёл кладку алмазов :)',
   'мне уже надоели эти зомбаки',
   'отлично, спасибо за беспокойствие',
+  'очень волнуюсь, сегодня хочу одолеть дракона',
+  'всё супер, вчера занял первое место в конкурсе поединков',
+  'сегодня прекрасная погода, неправда ли?',
 ];
+
+// смена параметров при спавне
+
+bot.once('spawn', () => {
+  mcData = require('minecraft-data')(bot.version);
+  setHomePos(bot.spawnPoint);
+  bot.chat('здарова ублюдки');
+});
+
+// отслеживание ресурспаков
+
+bot.once('resourcePack', () => {
+  bot.acceptResourcePack();
+});
+
+//
 
 // коогда что то выбрасывается
 
@@ -60,28 +95,23 @@ bot.on('playerCollect', (collector, itemDrop) => {
 
 // прийти к игроку
 
-let guardPos = null;
-
-bot.once('spawn', () => (guardPos = bot.spawnPoint));
-
 function guardArea(pos) {
-  setGuardPos(pos.clone());
+  setHomePos(pos.clone());
 
   if (!bot.pvp.target) {
-    moveToPos(guardPos);
+    moveToPos(homePos);
   }
 }
 
 function stopGuarding() {
   bot.pvp.stop();
   bot.pathfinder.setGoal(null);
-  if (guardPos) {
-    moveToPos(guardPos);
+  if (homePos) {
+    moveToPos(homePos);
   }
 }
 
 function moveToPos(position) {
-  const mcData = require('minecraft-data')(bot.version);
   bot.pathfinder.setMovements(new Movements(bot, mcData));
 
   bot.pathfinder.setGoal(
@@ -99,12 +129,12 @@ function attackSome(entity) {
   }
 }
 
-function setGuardPos(position) {
+function setHomePos(position) {
   if (Math.floor(position.y) !== position.y) {
-    guardPos = { ...position, y: position.y + 1 };
+    homePos = { ...position, y: position.y + 1 };
     return;
   }
-  guardPos = position;
+  homePos = position;
 }
 
 // авто еда
@@ -113,7 +143,7 @@ bot.once('spawn', () => {
   bot.autoEat.options = {
     priority: 'foodPoints',
     startAt: 14,
-    bannedFood: [],
+    bannedFood: ['golden_apple', 'enchanted_golden_apple'],
   };
 });
 
@@ -124,16 +154,22 @@ bot.on('health', () => {
     bot.chat(`Твою мать! ${bot.health.toFixed(1) / 2}хп осталось`);
 });
 
-// остановить атаку
+// остановка атаку
 
 bot.on('stoppedAttacking', () => {
-  if (guardPos && !activeFollow) {
-    moveToPos(guardPos);
+  if (homePos && !activeFollow && !collecting) {
+    moveToPos(homePos);
     return;
   }
 
   if (activeFollow) {
     followPlayer(activeFollow);
+  }
+
+  if (collecting) {
+    bot.chat(`Не у далось дособирать ${collecting}`);
+    collecting = false;
+    moveToPos(homePos);
   }
 });
 
@@ -142,6 +178,7 @@ bot.on('stoppedAttacking', () => {
 bot.on('physicTick', () => {
   if (bot.pvp.target) return;
   if (bot.pathfinder.isMoving()) return;
+  if (collecting) return;
 
   const filterEntity = (entity) =>
     entity.type === 'player' &&
@@ -153,7 +190,7 @@ bot.on('physicTick', () => {
 // атаковать ближайших мобов
 
 bot.on('physicTick', () => {
-  if (!guardPos) return;
+  if (!guarding) return;
 
   const filter = (e) =>
     e.type === 'mob' &&
@@ -181,9 +218,8 @@ async function goToSleep() {
   if (bed) {
     try {
       await bot.sleep(bed);
-      bot.chat('Я сплю');
     } catch (err) {
-      bot.chat(`Я не могу уснуть: ${err.message}`);
+      return;
     }
   } else {
     bot.chat('Нет кровати поблизости');
@@ -217,7 +253,6 @@ function followPlayer(player) {
     return;
   }
 
-  const mcData = require('minecraft-data')(bot.version);
   const movements = new Movements(bot, mcData);
   movements.scafoldingBlocks = [];
 
@@ -234,6 +269,68 @@ function stopFollow() {
   activeFollow = false;
 }
 
+// собирать блоки
+
+async function collectBlocks(args) {
+  let count = 1;
+  if (args[2]) count = parseInt(args[2]);
+
+  const blockType = mcData.blocksByName[args[1]];
+  if (!blockType) {
+    bot.chat('Я не знаю блоков с таким названием');
+    return;
+  }
+
+  const blocks = bot.findBlocks({
+    matching: blockType.id,
+    maxDistance: 64,
+    count: count,
+  });
+
+  if (blocks.length === 0) {
+    bot.chat('Нет таких болоков поблизости');
+    return;
+  }
+
+  const targets = [];
+  for (let i = 0; i < Math.min(blocks.length, count); i++) {
+    targets.push(bot.blockAt(blocks[i]));
+  }
+  bot.chat(`Иду собирать ${targets.length} ${blockType.displayName}`);
+
+  try {
+    collecting = blockType.displayName;
+    await bot.collectBlock.collect(targets);
+    stopCollect();
+    bot.chat('Готово');
+    moveToPos(homePos);
+    bot.chat('Я домой');
+  } catch (err) {
+    bot.chat(`Ошибка: ${err.message}`);
+    moveToPos(homePos);
+    bot.chat('Я домой');
+  }
+}
+
+function stopCollect() {
+  if (collecting) {
+    bot.chat(`Я больше не собираю ${collecting}`);
+    collecting = false;
+  }
+}
+
+// охрана дома
+
+function trueGuarding() {
+  guarding = true;
+  bot.chat('Теперь я охраняю точку дома');
+}
+
+function falseGuarding() {
+  guarding = false;
+  bot.chat('Я больше не охраняю точку дома');
+}
+
 // рандомное число
 
 function randomInteger(min, max) {
@@ -247,10 +344,11 @@ bot.on('chat', (username, message) => {
   if (username === bot.username) return;
 
   if (username === 'Swingor') {
-    switch (message.toLowerCase().slice(0, 5)) {
+    switch (message.toLowerCase().split(' ')[0]) {
       case 'fight':
+        stopCollect();
         stopFollow();
-        const fightPlayer = bot.players[message.substr(6)];
+        const fightPlayer = bot.players[message.split(' ')[1]];
 
         if (!fightPlayer) {
           bot.chat('Я не вижу цель');
@@ -260,6 +358,33 @@ bot.on('chat', (username, message) => {
         bot.chat('Тебе хана!');
         attackSome(fightPlayer.entity);
         break;
+      case 'come':
+        stopCollect();
+        stopFollow();
+        let comePlayer = bot.players[message.split(' ')[1]].entity.position;
+
+        if (Math.floor(comePlayer.y) !== comePlayer.y) {
+          comePlayer = { ...comePlayer, y: comePlayer.y + 1 };
+        }
+
+        moveToPos(comePlayer);
+        bot.chat('Уже бегу!');
+        break;
+      case 'go':
+        stopCollect();
+        stopFollow();
+        const cords = {
+          x: message.split(' ')[1],
+          y: message.split(' ')[2],
+          z: message.split(' ')[3],
+        };
+
+        moveToPos(cords);
+        break;
+      case 'collect':
+        const args = message.split(' ');
+        collectBlocks(args);
+        break;
     }
 
     switch (message.toLowerCase()) {
@@ -268,15 +393,19 @@ bot.on('chat', (username, message) => {
         bot.chat('Так уж и быть, пожалею тебя');
         break;
       case 'go home':
-        if (!guardPos) {
+        if (!homePos) {
           bot.chat('У меня нет дома');
           return;
         }
+        stopCollect();
+        stopGuarding();
         stopFollow();
-        moveToPos(guardPos);
+        moveToPos(homePos);
         bot.chat('Бегу домой');
         break;
-      case 'guard':
+      case 'sethome':
+        stopCollect();
+        stopGuarding();
         stopFollow();
         const guardPlayer = bot.players[username];
 
@@ -289,6 +418,7 @@ bot.on('chat', (username, message) => {
         bot.chat('Теперь это мой дом');
         break;
       case 'follow':
+        stopCollect();
         followPlayer(username);
         bot.chat('Я следую за тобой');
         break;
@@ -297,24 +427,12 @@ bot.on('chat', (username, message) => {
         bot.pathfinder.setGoal(null);
         bot.chat('Я больше не следую за тобой');
         break;
-    }
-
-    switch (message.toLowerCase().slice(0, 4)) {
-      case 'come':
-        stopFollow();
-        let comePlayer = bot.players[message.substr(5)].entity.position;
-
-        if (Math.floor(comePlayer.y) !== comePlayer.y) {
-          comePlayer = { ...comePlayer, y: comePlayer.y + 1 };
-        }
-
-        moveToPos(comePlayer);
-        bot.chat('Уже бегу!');
+      case 'guarding':
+        trueGuarding();
         break;
-    }
-  } else {
-    if (message.toLowerCase().slice(0, 5) === 'fight') {
-      bot.chat('Я тебя не слушаюсь');
+      case 'stop guarding':
+        falseGuarding();
+        break;
     }
   }
 
@@ -324,6 +442,9 @@ bot.on('chat', (username, message) => {
       break;
     case 'как дела':
       bot.chat(moods[randomInteger(0, moods.length)]);
+      break;
+    case 'расскажи анекдот':
+      bot.chat(jokes[randomInteger(0, jokes.length)]);
       break;
   }
 });
