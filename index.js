@@ -25,16 +25,16 @@ bot.loadPlugin(collectBlock);
 
 let activeFollow = false;
 let collecting = false;
-let guarding = false;
+let guarding = true;
 let homePos = null;
 let mcData;
 
 const jokes = [
-  'velkaa: что там?\nlav: Стасег красафчег\nlav: Я его надоумил попробовать в Майнкрафт на геймпаде поиграть\nlav: Он подключил ПИЛОТНыЙ РУЛЬ и теперь у него не песочница, а СИМУЛЯТОР ЭКСКАВАТОРА',
+  'velkaa: что там?\nlav: Стасег красафчег\nlav: Я его надоумил попробовать в Майнкрафт на геймпаде поиграть\nlav: Он подключил ПИЛОТНЫЙ РУЛЬ и теперь у него не песочница, а СИМУЛЯТОР ЭКСКАВАТОРА',
   'Нуб и опытный игрок бродят по серверу.Вдруг нуб говорит:\n- А чё это за огурец к нам бежит? А может мне подойти поближе...',
   'Приходит ГГ (главный герой) как то домой после шахты уставший, камней столько, хоть великую китайскую стену строй. Смотрит а там криппер с херобрином тортик едят. Херобрин говорит:\nПривет, друг устал? садись к нам тортик кушать.\nГГ:\nНе те грибы были в тарелке…',
   'Ну значит урок.\nСидят зомби за партами. Вдруг врывается в кабинет крипер, и не здороваясь садится на место.\nУчительница (херобрин) :\n-Крипер! Выйди и зайди как заходит домой твой папа-крипер!\nОн выходит, с размаха открывает дверь, и орет :\n- НУ ЧТО СВОЛОЧИ, НЕ ЖДАЛИ?!',
-  'Забросили как-то крипера, зомби, и скелета на необитаемый остров.\nТут набежали херобрины, сказали : тот кто пробежит быстрее, и соберет 10 блоков или предметов, того отпустим.\nНу бежит значит крипер. Насобирал 10 батонов.\nПрибегает, ему говорят : засунь их себе в ж*пу, тогда отпустим\nНу он засунул 8 и умер.\nТут бежит зомби. Принес 10 горсток сахара. Ну засунул, и стоит.\nЕму говорят : что стоишь, идти уже можешь\nА он : Да скелет там мечей насобирал, посмотреть хочу',
+  'Забрели как-то крипера, зомби, и скелета на необитаемый остров.\nТут набежали херобрины, сказали : тот кто пробежит быстрее, и соберет 10 блоков или предметов, того отпустим.\nНу бежит значит крипер. Насобирал 10 батонов.\nПрибегает, ему говорят : засунь их себе в ж*пу, тогда отпустим\nНу он засунул 8 и умер.\nТут бежит зомби. Принес 10 горсток сахара. Ну засунул, и стоит.\nЕму говорят : что стоишь, идти уже можешь\nА он : Да скелет там мечей насобирал, посмотреть хочу',
   'Ехали парни из клана на сервере воевать с другим кланом. Такие все мрачные — у всех ведь алмазные шмотки, жаль терять. А командир такой говорит:\n- Да ладно вам, ребят. Зато, прикиньте, за каждого убитого нам дадут по 1000 на человека!\nНу они такие все стали боевыми и веселыми, уже приготовились. Как только вагонетки останавливаются, они как вылетают с луками и мечами! Командир только рот раскрыл. Через полчаса вернулись они, все в крови, с новейшими шмотками и с головами игроков. А командир че-то в обморок упал. Они его в чувство привели, а он им:\n- Ребята, да вы че, о***ли? Мы же в городе остановились для перекуса!',
   '-Жизнь так жестока в MineCraft.\n-Что? Тебя кто-то убил?\n-Да!\n-И кто же?\n-Кактус! :,((',
 ];
@@ -66,8 +66,6 @@ bot.once('spawn', () => {
 bot.once('resourcePack', () => {
   bot.acceptResourcePack();
 });
-
-//
 
 // коогда что то выбрасывается
 
@@ -143,16 +141,77 @@ bot.once('spawn', () => {
   bot.autoEat.options = {
     priority: 'foodPoints',
     startAt: 14,
-    bannedFood: ['golden_apple', 'enchanted_golden_apple'],
+    bannedFood: [
+      'golden_apple',
+      'enchanted_golden_apple',
+      'rotten_flesh',
+      'poisonous_potato',
+      'pufferfish',
+    ],
   };
 });
 
+function findEat() {
+  const food = [
+    'stew',
+    'cooked',
+    'pumpkin_pie',
+    'soup',
+    'carrot',
+    'honey_bottle',
+    'potato',
+    'bread',
+    'apple',
+    'beef',
+    'rabbit',
+    'porkchop',
+    'berries',
+    'melon_slice',
+    'chicken',
+    'cod',
+    'salmon',
+    'cookie',
+    'mutton',
+    'beetroot',
+    'tropical_fish',
+    'dried_kelp',
+  ];
+
+  const filterFood = food.filter((item) =>
+    bot.inventory.items().find((elem) => elem.name.includes(item))
+  );
+
+  if (filterFood.length === 0) {
+    bot.chat('У меня закончилась еда!');
+  }
+}
+
 bot.on('health', () => {
+  findEat();
   if (bot.food === 20) bot.autoEat.disable();
   else bot.autoEat.enable();
+
   if (Math.floor(bot.health) === 6)
     bot.chat(`Твою мать! ${bot.health.toFixed(1) / 2}хп осталось`);
 });
+
+// добывать еду
+
+const foodMobs = ['pig'];
+
+async function collectFood() {
+  const filter = (e) =>
+    e.type === 'mob' &&
+    e.position.distanceTo(bot.entity.position) < 100 &&
+    foodMobs.map((mob) => (e.name === mob ? true : false));
+
+  const entity = bot.nearestEntity(filter);
+  if (entity) {
+    bot.chat('Иду добывать еду');
+    // moveToPos(entity.position);
+    console.log(entity);
+  } else bot.chat('Я не нашёл мобов для добычи еды');
+}
 
 // остановка атаку
 
@@ -167,7 +226,7 @@ bot.on('stoppedAttacking', () => {
   }
 
   if (collecting) {
-    bot.chat(`Не у далось дособирать ${collecting}`);
+    bot.chat(`Не у далось дособирать ${collecting}, мне помешал монстр`);
     collecting = false;
     moveToPos(homePos);
   }
@@ -176,9 +235,7 @@ bot.on('stoppedAttacking', () => {
 // смотреть на ближайшего игрока
 
 bot.on('physicTick', () => {
-  if (bot.pvp.target) return;
-  if (bot.pathfinder.isMoving()) return;
-  if (collecting) return;
+  if (bot.pvp.target || bot.pathfinder.isMoving() || collecting) return;
 
   const filterEntity = (entity) =>
     entity.type === 'player' &&
@@ -189,14 +246,48 @@ bot.on('physicTick', () => {
 
 // атаковать ближайших мобов
 
+const attacksMobs = [
+  'Phantom',
+  'Blaze',
+  'Ghast',
+  'Magma Cube',
+  'Silverfish',
+  'Skeleton',
+  'Slime',
+  'Spider Jockey',
+  'Zombie',
+  'Zombie Villager',
+  'Drowned',
+  'Wither Skeleton',
+  'Witch',
+  'Vindicator',
+  'Evoker',
+  'Pillager',
+  'Ravager',
+  'Vex',
+  'Evocation Fang',
+  'Chicken Jockey',
+  'Piglin Brute',
+  'Hoglin',
+  'Zoglin',
+  'Endermite',
+  'Guardian',
+  'Elder Guardian',
+  'Shulker',
+  'Skelton Cavalry',
+  'Husk',
+  'Stray',
+  'Ender Dragon',
+  'Wither',
+];
+
 bot.on('physicTick', () => {
   if (!guarding) return;
 
   const filter = (e) =>
     e.type === 'mob' &&
     e.position.distanceTo(bot.entity.position) < 8 &&
-    e.mobType !== 'Armor Stand';
-
+    attacksMobs.map((mob) => (e.mobType === mob ? true : false));
   const entity = bot.nearestEntity(filter);
   attackSome(entity);
 });
@@ -383,7 +474,16 @@ bot.on('chat', (username, message) => {
         break;
       case 'collect':
         const args = message.split(' ');
-        collectBlocks(args);
+        if (args[1]) {
+          if (args[1].toLowerCase() !== 'food') {
+            collectBlocks(args);
+            return;
+          }
+          if (args[1].toLowerCase() === 'food') {
+            collectFood();
+            return;
+          }
+        }
         break;
     }
 
