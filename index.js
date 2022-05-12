@@ -197,21 +197,49 @@ bot.on('health', () => {
 
 // добывать еду
 
-const foodMobs = ['pig'];
+const foodMobs = ['Pig', 'Chicken', 'Cow', 'Sheep', 'Rabbit'];
+const needFood = ['porkchop', 'beef', 'chicken', 'rabbit', 'mutton'];
 
-async function collectFood() {
-  const filter = (e) =>
-    e.type === 'mob' &&
-    e.position.distanceTo(bot.entity.position) < 100 &&
-    foodMobs.map((mob) => (e.name === mob ? true : false));
-
-  const entity = bot.nearestEntity(filter);
-  if (entity) {
-    bot.chat('Иду добывать еду');
-    // moveToPos(entity.position);
-    console.log(entity);
-  } else bot.chat('Я не нашёл мобов для добычи еды');
+function checkNeedFood() {
+  let ifFood = false;
+  needFood.map((elem) => {
+    if (!ifFood) {
+      const invItem = bot.inventory
+        .items()
+        .find((item) => item.name.includes(elem));
+      if (invItem) invItem.count > 20 ? (ifFood = true) : null;
+    }
+  });
+  return ifFood;
 }
+// НЕ РАБОТАЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕЕТТТТ!!!!!!!!!!!!!!!!!!!!!!
+async function collectFood() {
+  if (!checkNeedFood()) {
+    const filter = (e) =>
+      e.type === 'mob' &&
+      e.position.distanceTo(bot.entity.position) < 100 &&
+      foodMobs.includes(e.mobType);
+
+    const entity = bot.nearestEntity(filter);
+    if (entity) {
+      collecting = entity.mobType;
+      bot.chat('Иду добывать еду');
+      await moveToPos(entity.position);
+      await attackSome(entity);
+      // await collectFood();
+    } else bot.chat('Я не нашёл мобов для добычи еды');
+  } else {
+    bot.chat('Еды достаточно, я домой');
+    moveToPos(homePos);
+  }
+}
+
+bot.on('itemDrop', (item) => {
+  if (item.position.distanceTo(bot.entity.position) < 10 && collecting) {
+    collecting = false;
+    moveToPos(item.position);
+  }
+});
 
 // остановка атаку
 
@@ -279,6 +307,7 @@ const attacksMobs = [
   'Stray',
   'Ender Dragon',
   'Wither',
+  'Spider',
 ];
 
 bot.on('physicTick', () => {
@@ -287,7 +316,7 @@ bot.on('physicTick', () => {
   const filter = (e) =>
     e.type === 'mob' &&
     e.position.distanceTo(bot.entity.position) < 8 &&
-    attacksMobs.map((mob) => (e.mobType === mob ? true : false));
+    attacksMobs.includes(e.mobType);
   const entity = bot.nearestEntity(filter);
   attackSome(entity);
 });
